@@ -6,15 +6,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext"; // ✅ Context import
+
 // ✅ Validation Schema
 const schema = yup.object().shape({
   email: yup.string().email("Invalid email").required("Email is required"),
-  password: yup.string().required("Password is required").min(6, "Min 6 characters"),
+  password: yup
+    .string()
+    .required("Password is required")
+    .min(6, "Min 6 characters"),
 });
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-    const router = useRouter();
+  const router = useRouter();
+  const { login } = useAuth(); // ✅ useAuth hook
+
   // ✅ React Hook Form
   const {
     register,
@@ -22,7 +29,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm({ resolver: yupResolver(schema) });
 
-  // ✅ Submit Handler
+  // ✅ Submit Handler (JWT Save + Context Update)
   const onSubmit = async (data) => {
     setLoading(true);
     try {
@@ -31,12 +38,20 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+
       const result = await res.json();
 
       if (result.token) {
-        localStorage.setItem("token", result.token);
+        // ✅ Context update karein (localStorage bhi handle karega)
+        login(result.token);
+
+        // ✅ Optionally save user info
+        if (result.user) {
+          localStorage.setItem("user", JSON.stringify(result.user));
+        }
+
         toast.success("Login successful!");
-        router.push("/"); // ✅ Redirect to Home page
+        router.push("/profile"); // Redirect to profile page
       } else {
         toast.error(result.error || "Login failed!");
       }
@@ -50,7 +65,9 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-100 to-pink-200">
       <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6 text-purple-700">Login</h1>
+        <h1 className="text-3xl font-bold text-center mb-6 text-purple-700">
+          Login
+        </h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Email */}
@@ -61,7 +78,9 @@ export default function LoginPage() {
               {...register("email")}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
-            {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="text-red-500 text-sm">{errors.email.message}</p>
+            )}
           </div>
 
           {/* Password */}
@@ -72,9 +91,20 @@ export default function LoginPage() {
               {...register("password")}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
-            {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
+            {errors.password && (
+              <p className="text-red-500 text-sm">
+                {errors.password.message}
+              </p>
+            )}
           </div>
-          <p className="text-center">Don't have an account yet? <Link className="text-purple-600 underline" href={"/signup"}>Sign Up here!</Link> </p>
+
+          <p className="text-center">
+            Don&apos;t have an account yet?{" "}
+            <Link className="text-purple-600 underline" href={"/signup"}>
+              Sign Up here!
+            </Link>
+          </p>
+
           {/* Button */}
           <button
             type="submit"
